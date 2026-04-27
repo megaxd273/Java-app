@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: pg-init
+spec:
+  template:
+    spec:
+      containers:
+        - name: psql
+          image: postgres:18.3
+          env:
+            - name: PGPASSWORD
+              value: "postgres"
+          command:
+            - sh
+            - -c
+            - |
+              psql -h postgres-postgresql -U postgres <<EOF
+              CREATE USER java_user WITH PASSWORD 'qwezxc123';
+              CREATE DATABASE java_db OWNER java_user;
+              EOF
+      restartPolicy: Never

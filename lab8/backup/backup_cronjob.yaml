@@ -1,0 +1,50 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: postgres-backup
+spec:
+  schedule: "*/5 * * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          nodeSelector:
+            kubernetes.io/hostname: kind-control-plane
+
+          containers:
+          - name: backup
+            image: postgres:18.3
+            command:
+              - /bin/bash
+              - -c
+              - |
+                export PGPASSWORD="${PGPASSWORD}"
+                pg_dumpall \
+                  -h postgres-postgresql \
+                  -U postgres \
+                  --clean \
+                  --if-exists \
+                  --no-password \
+                  --file="/backup/pg_dumpall-$(date '+%Y-%m-%d-%H-%M').sql"
+
+            env:
+            - name: PGPASSWORD
+              value: postgres
+
+            volumeMounts:
+            - name: backup-volume
+              mountPath: /backup
+
+          restartPolicy: OnFailure
+
+          tolerations:
+          - key: "node-role.kubernetes.io/control-plane"
+            operator: "Exists"
+            effect: "NoSchedule"
+
+          volumes:
+          - name: backup-volume
+            persistentVolumeClaim:
+              claimName: postgres-backup-pvc

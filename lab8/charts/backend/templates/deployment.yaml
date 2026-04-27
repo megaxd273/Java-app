@@ -1,0 +1,59 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "backend.fullname" . }}
+  labels:
+    {{- toYaml .Values.labels | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- toYaml .Values.selectorLabels | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- toYaml .Values.selectorLabels | nindent 8 }}
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox
+          command: ['sh', '-c', 'until nc -z postgres-postgresql 5432; do sleep 2; done']
+      containers:
+        - name: {{ .Chart.Name }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          env:
+            - name: POSTGRES_HOST
+              value: {{ .Values.env.POSTGRES_HOST | quote }}
+            - name: POSTGRES_PORT
+              value: {{ .Values.env.POSTGRES_PORT | quote }}
+            - name: POSTGRES_USER
+              value: {{ .Values.env.POSTGRES_USER | quote }}
+            - name: POSTGRES_DB
+              value: {{ .Values.env.POSTGRES_DB | quote }}
+            - name: REDIS_HOST
+              value: {{ .Values.env.REDIS_HOST | quote }}
+            - name: REDIS_PORT
+              value: {{ .Values.env.REDIS_PORT | quote }}
+            - name: FLUENTD_ENABLED
+              value: {{ .Values.env.FLUENTD_ENABLED | quote }}
+            - name: FLUENTD_HOST
+              value: {{ .Values.env.FLUENTD_HOST | quote }}
+            - name: FLUENTD_PORT
+              value: {{ .Values.env.FLUENTD_PORT | quote }}
+            - name: SERVER_PORT
+              value: {{ .Values.env.SERVER_PORT | quote }}
+            - name: DEBUG
+              value: {{ .Values.env.DEBUG | quote }}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "backend.fullname" . }}-secret
+                  key: POSTGRES_PASSWORD
+

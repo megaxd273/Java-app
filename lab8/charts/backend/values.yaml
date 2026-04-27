@@ -1,0 +1,42 @@
+replicaCount: 1
+image:
+  repository: java
+  tag: "final"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8081
+
+labels:
+  app: backend
+
+selectorLabels:
+  app: backend
+
+resources:
+  requests:
+    cpu: "100m"
+    memory: "128Mi"
+  limits:
+    cpu: "250m"
+    memory: "320Mi"
+
+env:
+  POSTGRES_HOST: postgres-postgresql
+  POSTGRES_PORT: 5432
+  POSTGRES_USER: java_user
+  POSTGRES_DB: java_db
+
+  REDIS_HOST: redis-master
+  REDIS_PORT: 6379
+
+  FLUENTD_ENABLED: false
+  FLUENTD_HOST: localhost
+  FLUENTD_PORT: 24224
+
+  SERVER_PORT: 8081
+  DEBUG: true
+
+secret:
+  POSTGRES_PASSWORD: qwezxc123

@@ -1,0 +1,15 @@
+schedule: "*/5 * * * *"
+
+image: postgres:18.3
+
+node: kind-control-plane
+
+storage:
+  size: 1Gi
+  class: manual
+  hostPath: /mnt/shared
+
+postgres:
+  host: postgres-postgresql
+  user: postgres
+  password: postgres

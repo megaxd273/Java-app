@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: {{ .Release.Name }}-backup-pv
+spec:
+  capacity:
+    storage: {{ .Values.storage.size }}
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: {{ .Values.storage.class }}
+  persistentVolumeReclaimPolicy: Retain
+  hostPath:
+    path: {{ .Values.storage.hostPath }}

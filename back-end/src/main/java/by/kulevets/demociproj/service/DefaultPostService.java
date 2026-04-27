@@ -38,7 +38,7 @@ public class DefaultPostService implements PostService {
     public DefaultPostService(@Value("${fluentd.host}") String fluentdHost, @Value("${fluentd.port}") String fluentdPort, PostRepository postRepository, RedisPostRepository redisPostRepository, RedisTemplate<String, Object> redisTemplate, Mapper mapper, @Value("${fluentd.enabled}") Boolean fluentdEnabled) {
         this.fluentdEnabled = fluentdEnabled;
         this.LOG = fluentdEnabled ? FluentLogger.getLogger(
-                "[demo-ci-proj]",
+                "backend",
                 fluentdHost,
                 Integer.parseInt(fluentdPort))
                 : null;
@@ -60,23 +60,23 @@ public class DefaultPostService implements PostService {
                 Map<String, Object> logmap = FluentdUtils.buildLog(
                         LogLevel.INFO,
                         Layer.SERVICE,
-                        DefaultPostService.class.getName().concat("#create"),
+                        DefaultPostService.class.getName().concat("create"),
                         "Pojo was saved",
                         model
                 );
-                LOG.log("#create", logmap);
+                LOG.log("create", logmap);
             }
         } catch (IllegalStateException e) {
             if (fluentdEnabled) {
                 Map<String, Object> logmap = FluentdUtils.buildLog(
                         LogLevel.ERROR,
                         Layer.SERVICE,
-                        DefaultPostService.class.getName().concat("#create"),
+                        DefaultPostService.class.getName().concat("create"),
                         e.getMessage(),
                         pojo
                 );
                 log.info("Collected errorMap: {}", logmap);
-                LOG.log("#create", logmap);
+                LOG.log("create", logmap);
             }
             log.error(e.getMessage());
         }

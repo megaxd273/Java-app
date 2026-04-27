@@ -1,0 +1,28 @@
+FROM gradle:8.5.0-jdk21 AS build
+
+WORKDIR /app
+COPY gradle gradle
+COPY *.gradle .
+COPY gradlew .
+COPY settings.gradle .
+RUN ./gradlew dependencies --no-daemon
+
+COPY src src
+RUN ./gradlew bootJar --no-daemon
+
+FROM eclipse-temurin:21.0.4_7-jre-noble AS runtime
+
+WORKDIR /opt/backend
+
+RUN useradd -m appuser
+
+COPY --from=build /app/build/libs/ci-back-end-0.0.1-SNAPSHOT.jar ./java-app.jar
+
+RUN chown appuser:appuser java-app.jar
+
+USER appuser
+
+EXPOSE 8081
+
+ENTRYPOINT ["java","-jar", "java-app.jar"]
+

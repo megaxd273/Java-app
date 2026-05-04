@@ -1,8 +1,11 @@
 replicaCount: 1
 image:
-  repository: java
-  tag: "final"
+  repository: gitlab:5050/root/test/java-backend
+  tag: "latest"
   pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: gitlab-auth
 
 service:
   type: ClusterIP

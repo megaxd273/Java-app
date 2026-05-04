@@ -1,0 +1,10 @@
+*.swp
+*.swo
+.sw[a-p]
+
+lab8/
+
+target/
+build/
+node_modules/
+.gradle/

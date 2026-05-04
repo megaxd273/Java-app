@@ -1,8 +1,11 @@
 replicaCount: 1
 image:
-  repository: nginx
+  repository: gitlab:5050/root/test/react-frontend
   pullPolicy: IfNotPresent
-  tag: "final"
+  tag: "latest"
+
+imagePullSecrets:
+  - name: gitlab-auth
 
 labels:
   app: frontend

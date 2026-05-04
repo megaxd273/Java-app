@@ -1,24 +1,13 @@
 server {
-        listen 80;
-        server_name localhost;
-        return 301 https://$host$request_uri;
+    listen 80;
+    root /var/www/frontend;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    location /api/ {
+        proxy_pass http://backend:8081; 
+    }
 }
-server {
-
-        listen 443 ssl;
-        root /var/www/frontend;
-        index index.html;
-        server_name localhost;
-
-        ssl_certificate /etc/nginx/ssl/nginx.crt;
-        ssl_certificate_key /etc/nginx/ssl/nginx.key;
-
-        location / {
-                try_files $uri $uri/ =404;
-        }
-
-        location /api/ {
-                proxy_pass http://backend:8081;
-        }
-}
-

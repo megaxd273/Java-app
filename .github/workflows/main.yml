@@ -1,40 +1,22 @@
-name: Build Images
+name: Test K8s Access
 
 on:
   push:
     branches: [ main ]
 
 jobs:
-  build-back:
+  test:
     runs-on: self-hosted
+
+    container:
+      image: alpine/helm:3.12.0
+      options: --entrypoint ""
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Helm test
+        run: |
+          helm version
+          helm list -A
 
-      - name: Kaniko build backend
-        uses: aevea/action-kaniko@master
-        with:
-          registry: gitlab:5050
-          image: root/test/java-backend
-          username: ${{ secrets.GITLAB_REGISTRY_USER }}
-          password: ${{ secrets.GITLAB_REGISTRY_PASSWORD }}
-          tag: ${{ github.sha }}
-          path: back-end
-          build_file: dockerfile
-          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"
 
-  build-front:
-    runs-on: self-hosted
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Kaniko build frontend
-        uses: aevea/action-kaniko@master
-        with:
-          registry: gitlab:5050
-          image: root/test/react-frontend
-          username: ${{ secrets.GITLAB_REGISTRY_USER }}
-          password: ${{ secrets.GITLAB_REGISTRY_PASSWORD }}
-          tag: ${{ github.sha }}
-          path: front-end
-          build_file: dockerfile
-          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"

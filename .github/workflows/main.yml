@@ -24,7 +24,8 @@ jobs:
           password: Qwezxc123$
           # Тэг — хеш коммита
           tag: ${{ github.sha }}
-          # Путь к контексту бэкенда
           path: back-end
+          # Указываем правильное имя файла и путь относительно контекста (просто имя файла)
+          build_file: dockerfile 
           # Добавляем флаги для работы с локальным/незащищенным реестром
           extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"

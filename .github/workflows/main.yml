@@ -1,58 +1,91 @@
-name: Build and Deploy
+name: Build and Deploy to K8s
 
 on:
   push:
-    branches: ["main"]
+    branches: [ "main", "master" ]
+
+env:
+  TAGS: "k8s"
+  REGISTRY: "gitlab:5050"
+  BACK_IMAGE: "$REGISTRY/root/test/java-backend"
+  FRONT_IMAGE: "$REGISTRY/root/test/react-frontend"
+  CHARTS_DIR: "charts"
+  DOCKER_USER: "root"
 
 jobs:
   build-back:
-    runs-on: self-hosted
-
+    runs-on: self-hosted 
+    container:
+      image: gcr.io/kaniko-project/executor:latest
+      entrypoint: [""]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build backend with kaniko
+      - name: Kaniko build backend
         run: |
-          kubectl run kaniko-build-back \
-            --rm -i --restart=Never \
-            --image=gcr.io/kaniko-project/executor:latest \
-            --overrides='
-            {
-              "spec": {
-                "containers": [{
-                  "name": "kaniko",
-                  "image": "gcr.io/kaniko-project/executor:latest",
-                  "args": [
-                    "--dockerfile=back-end/Dockerfile",
-                    "--context=dir://$(pwd)/back-end",
-                    "--destination=gitlab:5050/root/test/java-backend:${GITHUB_SHA}",
-                    "--insecure",
-                    "--skip-tls-verify"
-                  ],
-                  "volumeMounts": [{
-                    "name": "docker-config",
-                    "mountPath": "/kaniko/.docker"
-                  }]
-                }],
-                "volumes": [{
-                  "name": "docker-config",
-                  "secret": {
-                    "secretName": "regcred"
-                  }
-                }]
-              }
-            }'
+          # Создаём конфиг с авторизацией так же, как в твоём GitLab CI
+          echo "{\"auths\":{\"$REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$DOCKER_USER" "${{ secrets.GITLAB_REGISTRY_PASSWORD }}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+          
+          /kaniko/executor \
+            --context "${GITHUB_WORKSPACE}/${CONTEXT}" \
+            --dockerfile "${GITHUB_WORKSPACE}/${CONTEXT}/dockerfile" \
+            --destination "${DESTINATION}:${GITHUB_SHA::8}" \
+            --insecure \
+            --skip-tls-verify \
+            --ignore-path=/product_uuid \
+            --ignore-path=/proc \
+            --ignore-path=/sys
+        env:
+          CONTEXT: "back-end"
+          DESTINATION: ${{ env.BACK_IMAGE }}
 
-  deploy:
-    needs: build-back
+  build-front:
     runs-on: self-hosted
-
+    container:
+      image: gcr.io/kaniko-project/executor:latest
+      entrypoint: [""]
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Kaniko build frontend
+        run: |
+          echo "{\"auths\":{\"$REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$DOCKER_USER" "${{ secrets.GITLAB_REGISTRY_PASSWORD }}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
+          
+          /kaniko/executor \
+            --context "${GITHUB_WORKSPACE}/${CONTEXT}" \
+            --dockerfile "${GITHUB_WORKSPACE}/${CONTEXT}/dockerfile" \
+            --destination "${DESTINATION}:${GITHUB_SHA::8}" \
+            --insecure \
+            --skip-tls-verify \
+            --ignore-path=/product_uuid \
+            --ignore-path=/proc \
+            --ignore-path=/sys
+        env:
+          CONTEXT: "front-end"
+          DESTINATION: ${{ env.FRONT_IMAGE }}
+
+  deploy-app:
+    needs: [build-back, build-front]
+    runs-on: self-hosted
+    container:
+      image: alpine/helm:3.12.0
+      entrypoint: [""]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Deploy with Helm
         run: |
-          helm upgrade --install backend ./charts/backend \
+          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
+          
+          helm upgrade --install backend ./${CHARTS_DIR}/backend \
             --namespace default \
-            --set image.repository=gitlab:5050/root/test/java-backend \
-            --set image.tag=${GITHUB_SHA}
+            --set image.repository=${{ env.BACK_IMAGE }} \
+            --set image.tag=${SHORT_SHA}
+          
+          helm upgrade --install frontend ./${CHARTS_DIR}/frontend \
+            --namespace default \
+            --set image.repository=${{ env.FRONT_IMAGE }} \
+            --set image.tag=${SHORT_SHA}

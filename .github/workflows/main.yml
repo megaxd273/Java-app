@@ -1,4 +1,4 @@
-name: Build Backend
+name: Build Images
 
 on:
   push:
@@ -8,24 +8,33 @@ jobs:
   build-back:
     runs-on: self-hosted
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Kaniko build
+      - name: Kaniko build backend
         uses: aevea/action-kaniko@master
         with:
-          # Указываем твой реестр
           registry: gitlab:5050
-          # Путь к образу: root/test/java-backend
           image: root/test/java-backend
-          # Данные берем из твоего примера (root / Qwezxc123$)
-          # В идеале их лучше положить в GitHub Secrets
-          username: root
-          password: Qwezxc123$
-          # Тэг — хеш коммита
+          username: ${{ secrets.GITLAB_REGISTRY_USER }}
+          password: ${{ secrets.GITLAB_REGISTRY_PASSWORD }}
           tag: ${{ github.sha }}
           path: back-end
-          # Указываем правильное имя файла и путь относительно контекста (просто имя файла)
-          build_file: dockerfile 
-          # Добавляем флаги для работы с локальным/незащищенным реестром
+          build_file: dockerfile
+          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"
+
+  build-front:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kaniko build frontend
+        uses: aevea/action-kaniko@master
+        with:
+          registry: gitlab:5050
+          image: root/test/react-frontend
+          username: ${{ secrets.GITLAB_REGISTRY_USER }}
+          password: ${{ secrets.GITLAB_REGISTRY_PASSWORD }}
+          tag: ${{ github.sha }}
+          path: front-end
+          build_file: dockerfile
           extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"

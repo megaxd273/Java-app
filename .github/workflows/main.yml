@@ -11,59 +11,46 @@ env:
   CHARTS_DIR: "charts"
 
 jobs:
-  build-backend:
+  build:
     runs-on: self-hosted
-    container:
-      image: gcr.io/kaniko-project/executor:v1.9.1-debug # Используем debug версию, чтобы был доступен shell
+    strategy:
+      matrix:
+        component: [ {name: "back-end", img: "java-backend"}, {name: "front-end", img: "react-frontend"} ]
+    
     steps:
+      # Этот шаг работает на хосте раннера (там есть Node.js)
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Build and Push Backend
+      # Запускаем Kaniko через docker run, прокидывая секрет regcred из хоста
+      - name: Build and Push with Kaniko
         run: |
-          /kaniko/executor \
-            --context "${{ github.workspace }}/back-end" \
-            --dockerfile "${{ github.workspace }}/back-end/dockerfile" \
-            --destination "${{ env.BACK_IMAGE }}:${{ github.sha }}" \
-            --insecure \
-            --skip-tls-verify \
-            --ignore-path=/product_uuid
-
-  build-frontend:
-    runs-on: self-hosted
-    container:
-      image: gcr.io/kaniko-project/executor:v1.9.1-debug
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Build and Push Frontend
-        run: |
-          /kaniko/executor \
-            --context "${{ github.workspace }}/front-end" \
-            --dockerfile "${{ github.workspace }}/front-end/dockerfile" \
-            --destination "${{ env.FRONT_IMAGE }}:${{ github.sha }}" \
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace \
+            -v /home/runner/.docker/config.json:/kaniko/.docker/config.json \
+            gcr.io/kaniko-project/executor:latest \
+            --context /workspace/${{ matrix.component.name }} \
+            --dockerfile /workspace/${{ matrix.component.name }}/dockerfile \
+            --destination ${{ env.REGISTRY }}/root/test/${{ matrix.component.img }}:${{ github.sha }} \
             --insecure \
             --skip-tls-verify \
             --ignore-path=/product_uuid
 
   deploy:
-    needs: [build-backend, build-frontend]
+    needs: build
     runs-on: self-hosted
-    container:
-      image: alpine/helm:3.12.0
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy Helm charts
+      - name: Deploy Helm
         run: |
-          helm upgrade --install backend ./${{ env.CHARTS_DIR }}/backend \
+          # Используем helm напрямую, если он есть на раннере, 
+          # либо запускаем через docker run, если раннер совсем пустой
+          docker run --rm \
+            -v ${{ github.workspace }}:/apps \
+            -v ~/.kube:/root/.kube \
+            alpine/helm:3.12.0 \
+            upgrade --install ${{ matrix.component.name }} /apps/${{ env.CHARTS_DIR }}/backend \
             --namespace default \
-            --set image.repository=${{ env.BACK_IMAGE }} \
-            --set image.tag=${{ github.sha }}
-          
-          helm upgrade --install frontend ./${{ env.CHARTS_DIR }}/frontend \
-            --namespace default \
-            --set image.repository=${{ env.FRONT_IMAGE }} \
             --set image.tag=${{ github.sha }}

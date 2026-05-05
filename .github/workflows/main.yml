@@ -1,0 +1,58 @@
+name: Build and Deploy
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  build-back:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend with kaniko
+        run: |
+          kubectl run kaniko-build-back \
+            --rm -i --restart=Never \
+            --image=gcr.io/kaniko-project/executor:latest \
+            --overrides='
+            {
+              "spec": {
+                "containers": [{
+                  "name": "kaniko",
+                  "image": "gcr.io/kaniko-project/executor:latest",
+                  "args": [
+                    "--dockerfile=back-end/Dockerfile",
+                    "--context=dir://$(pwd)/back-end",
+                    "--destination=gitlab:5050/root/test/java-backend:${GITHUB_SHA}",
+                    "--insecure",
+                    "--skip-tls-verify"
+                  ],
+                  "volumeMounts": [{
+                    "name": "docker-config",
+                    "mountPath": "/kaniko/.docker"
+                  }]
+                }],
+                "volumes": [{
+                  "name": "docker-config",
+                  "secret": {
+                    "secretName": "regcred"
+                  }
+                }]
+              }
+            }'
+
+  deploy:
+    needs: build-back
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy with Helm
+        run: |
+          helm upgrade --install backend ./charts/backend \
+            --namespace default \
+            --set image.repository=gitlab:5050/root/test/java-backend \
+            --set image.tag=${GITHUB_SHA}

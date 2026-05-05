@@ -1,56 +1,30 @@
-name: CI/CD Pipeline
+name: Build Backend
 
 on:
   push:
     branches: [ main ]
 
-env:
-  REGISTRY: "gitlab:5050"
-  BACK_IMAGE: "gitlab:5050/root/test/java-backend"
-  FRONT_IMAGE: "gitlab:5050/root/test/react-frontend"
-  CHARTS_DIR: "charts"
-
 jobs:
-  build:
-    runs-on: self-hosted
-    strategy:
-      matrix:
-        component: [ {name: "back-end", img: "java-backend"}, {name: "front-end", img: "react-frontend"} ]
-    
-    steps:
-      # Этот шаг работает на хосте раннера (там есть Node.js)
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      # Запускаем Kaniko через docker run, прокидывая секрет regcred из хоста
-      - name: Build and Push with Kaniko
-        run: |
-          docker run --rm \
-            -v ${{ github.workspace }}:/workspace \
-            -v /home/runner/.docker/config.json:/kaniko/.docker/config.json \
-            gcr.io/kaniko-project/executor:latest \
-            --context /workspace/${{ matrix.component.name }} \
-            --dockerfile /workspace/${{ matrix.component.name }}/dockerfile \
-            --destination ${{ env.REGISTRY }}/root/test/${{ matrix.component.img }}:${{ github.sha }} \
-            --insecure \
-            --skip-tls-verify \
-            --ignore-path=/product_uuid
-
-  deploy:
-    needs: build
+  build-back:
     runs-on: self-hosted
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy Helm
-        run: |
-          # Используем helm напрямую, если он есть на раннере, 
-          # либо запускаем через docker run, если раннер совсем пустой
-          docker run --rm \
-            -v ${{ github.workspace }}:/apps \
-            -v ~/.kube:/root/.kube \
-            alpine/helm:3.12.0 \
-            upgrade --install ${{ matrix.component.name }} /apps/${{ env.CHARTS_DIR }}/backend \
-            --namespace default \
-            --set image.tag=${{ github.sha }}
+      - name: Kaniko build
+        uses: aevea/action-kaniko@master
+        with:
+          # Указываем твой реестр
+          registry: gitlab:5050
+          # Путь к образу: root/test/java-backend
+          image: root/test/java-backend
+          # Данные берем из твоего примера (root / Qwezxc123$)
+          # В идеале их лучше положить в GitHub Secrets
+          username: root
+          password: Qwezxc123$
+          # Тэг — хеш коммита
+          tag: ${{ github.sha }}
+          # Путь к контексту бэкенда
+          path: back-end
+          # Добавляем флаги для работы с локальным/незащищенным реестром
+          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"

@@ -71,7 +71,7 @@ jobs:
     runs-on: self-hosted
     container:
       image: alpine/helm:3.12.0
-      entrypoint: [""]
+      options: --entrypoint ""
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

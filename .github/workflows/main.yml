@@ -1,68 +1,69 @@
-name: Build and Deploy
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: ["main"]
+    branches: [ main ]
 
 env:
-  REGISTRY: gitlab:5050
-  BACK_IMAGE: gitlab:5050/root/test/java-backend
-  FRONT_IMAGE: gitlab:5050/root/test/react-frontend
-  TAG: ${{ github.sha }}
+  REGISTRY: "gitlab:5050"
+  BACK_IMAGE: "gitlab:5050/root/test/java-backend"
+  FRONT_IMAGE: "gitlab:5050/root/test/react-frontend"
+  CHARTS_DIR: "charts"
 
 jobs:
-
-  build-back:
-    runs-on: self-hosted
-
-    container:
-      image: gcr.io/kaniko-project/executor:latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Build backend
-        run: |
-          /kaniko/executor \
-            --context=./back-end \
-            --dockerfile=./back-end/Dockerfile \
-            --destination=${BACK_IMAGE}:${TAG} \
-            --insecure \
-            --skip-tls-verify \
-            --cache=true \
-            --cleanup
-
-  build-front:
+  build-backend:
     runs-on: self-hosted
     container:
-      image: gcr.io/kaniko-project/executor:latest
+      image: gcr.io/kaniko-project/executor:v1.9.1-debug # Используем debug версию, чтобы был доступен shell
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Build frontend
+      - name: Build and Push Backend
         run: |
           /kaniko/executor \
-            --context=./front-end \
-            --dockerfile=./front-end/Dockerfile \
-            --destination=${FRONT_IMAGE}:${TAG} \
+            --context "${{ github.workspace }}/back-end" \
+            --dockerfile "${{ github.workspace }}/back-end/dockerfile" \
+            --destination "${{ env.BACK_IMAGE }}:${{ github.sha }}" \
             --insecure \
             --skip-tls-verify \
-            --cache=true \
-            --cleanup
+            --ignore-path=/product_uuid
+
+  build-frontend:
+    runs-on: self-hosted
+    container:
+      image: gcr.io/kaniko-project/executor:v1.9.1-debug
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build and Push Frontend
+        run: |
+          /kaniko/executor \
+            --context "${{ github.workspace }}/front-end" \
+            --dockerfile "${{ github.workspace }}/front-end/dockerfile" \
+            --destination "${{ env.FRONT_IMAGE }}:${{ github.sha }}" \
+            --insecure \
+            --skip-tls-verify \
+            --ignore-path=/product_uuid
 
   deploy:
-    needs: [build-back, build-front]
+    needs: [build-backend, build-frontend]
     runs-on: self-hosted
-
     container:
       image: alpine/helm:3.12.0
-
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-      - name: Deploy helm
+      - name: Deploy Helm charts
         run: |
-          helm upgrade --install app ./charts/app \
+          helm upgrade --install backend ./${{ env.CHARTS_DIR }}/backend \
             --namespace default \
-            --set backend.image=${BACK_IMAGE}:${TAG} \
-            --set frontend.image=${FRONT_IMAGE}:${TAG}
+            --set image.repository=${{ env.BACK_IMAGE }} \
+            --set image.tag=${{ github.sha }}
+          
+          helm upgrade --install frontend ./${{ env.CHARTS_DIR }}/frontend \
+            --namespace default \
+            --set image.repository=${{ env.FRONT_IMAGE }} \
+            --set image.tag=${{ github.sha }}

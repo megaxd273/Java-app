@@ -1,91 +1,64 @@
-name: Build and Deploy to K8s
+name: Build and Deploy
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: ["main"]
 
 env:
-  TAGS: "k8s"
-  REGISTRY: "gitlab:5050"
-  BACK_IMAGE: "$REGISTRY/root/test/java-backend"
-  FRONT_IMAGE: "$REGISTRY/root/test/react-frontend"
-  CHARTS_DIR: "charts"
-  DOCKER_USER: "root"
+  REGISTRY: gitlab:5050
+  BACK_IMAGE: gitlab:5050/root/test/java-backend
+  FRONT_IMAGE: gitlab:5050/root/test/react-frontend
+  TAG: ${{ github.sha }}
 
 jobs:
-  build-back:
-    runs-on: self-hosted 
-    container:
-      image: gcr.io/kaniko-project/executor:latest
-      options: --entrypoint ""
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Kaniko build backend
+  build-back:
+    runs-on: self-hosted
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build backend
         run: |
-          # Создаём конфиг с авторизацией так же, как в твоём GitLab CI
-          echo "{\"auths\":{\"$REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$DOCKER_USER" "${{ secrets.GITLAB_REGISTRY_PASSWORD }}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
-          
           /kaniko/executor \
-            --context "${GITHUB_WORKSPACE}/${CONTEXT}" \
-            --dockerfile "${GITHUB_WORKSPACE}/${CONTEXT}/dockerfile" \
-            --destination "${DESTINATION}:${GITHUB_SHA::8}" \
+            --context=./back-end \
+            --dockerfile=./back-end/Dockerfile \
+            --destination=${BACK_IMAGE}:${TAG} \
             --insecure \
             --skip-tls-verify \
-            --ignore-path=/product_uuid \
-            --ignore-path=/proc \
-            --ignore-path=/sys
-        env:
-          CONTEXT: "back-end"
-          DESTINATION: ${{ env.BACK_IMAGE }}
+            --cache=true \
+            --cleanup
 
   build-front:
     runs-on: self-hosted
-    container:
-      image: gcr.io/kaniko-project/executor:latest
-      options: --entrypoint ""
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Kaniko build frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build frontend
         run: |
-          echo "{\"auths\":{\"$REGISTRY\":{\"auth\":\"$(printf "%s:%s" "$DOCKER_USER" "${{ secrets.GITLAB_REGISTRY_PASSWORD }}" | base64 | tr -d '\n')\"}}}" > /kaniko/.docker/config.json
-          
           /kaniko/executor \
-            --context "${GITHUB_WORKSPACE}/${CONTEXT}" \
-            --dockerfile "${GITHUB_WORKSPACE}/${CONTEXT}/dockerfile" \
-            --destination "${DESTINATION}:${GITHUB_SHA::8}" \
+            --context=./front-end \
+            --dockerfile=./front-end/Dockerfile \
+            --destination=${FRONT_IMAGE}:${TAG} \
             --insecure \
             --skip-tls-verify \
-            --ignore-path=/product_uuid \
-            --ignore-path=/proc \
-            --ignore-path=/sys
-        env:
-          CONTEXT: "front-end"
-          DESTINATION: ${{ env.FRONT_IMAGE }}
+            --cache=true \
+            --cleanup
 
-  deploy-app:
+  deploy:
     needs: [build-back, build-front]
     runs-on: self-hosted
+
     container:
       image: alpine/helm:3.12.0
-      options: --entrypoint ""
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
 
-      - name: Deploy with Helm
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy helm
         run: |
-          SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-8)
-          
-          helm upgrade --install backend ./${CHARTS_DIR}/backend \
+          helm upgrade --install app ./charts/app \
             --namespace default \
-            --set image.repository=${{ env.BACK_IMAGE }} \
-            --set image.tag=${SHORT_SHA}
-          
-          helm upgrade --install frontend ./${CHARTS_DIR}/frontend \
-            --namespace default \
-            --set image.repository=${{ env.FRONT_IMAGE }} \
-            --set image.tag=${SHORT_SHA}
+            --set backend.image=${BACK_IMAGE}:${TAG} \
+            --set frontend.image=${FRONT_IMAGE}:${TAG}

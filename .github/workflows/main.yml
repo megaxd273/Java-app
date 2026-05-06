@@ -21,7 +21,7 @@ jobs:
           path: back-end
           build_file: dockerfile
           extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"
-
+#asdf
   build-front:
     runs-on: self-hosted
     steps:

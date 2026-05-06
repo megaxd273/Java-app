@@ -39,20 +39,30 @@ jobs:
           build_file: dockerfile
           extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"
 
-# name: Test K8s Access
-
-# on:
-#   push:
-#     branches: [ main ]
-
-# jobs:
-#   test:
-#     runs-on: self-hosted
-
-#     steps:
-#       - name: Check helm
-#         run: |
-#           helm version
-#           kubectl version --client
-#           kubectl get ns
-#           helm list -A
+  deploy:
+    needs: [build-back, build-front]
+    runs-on: self-hosted
+  
+    steps:
+      - uses: actions/checkout@v4
+  
+      - name: Check access
+        run: |
+          kubectl get ns
+          helm list -A
+  
+      - name: Deploy backend
+        run: |
+  
+          helm upgrade --install backend ./charts/backend \
+            --namespace default \
+            --set image.repository=gitlab:5050/root/test/java-backend \
+            --set image.tag=${{ github.sha }}
+  
+      - name: Deploy frontend
+        run: |
+  
+          helm upgrade --install frontend ./charts/frontend \
+            --namespace default \
+            --set image.repository=gitlab:5050/root/test/react-frontend \
+            --set image.tag=${{ github.sha }}

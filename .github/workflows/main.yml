@@ -1,68 +1,141 @@
-name: Build Images
+name: Build and Deploy
 
 on:
   push:
     branches: [ main ]
+    paths:
+      - '.github/workflows/**'
+      - 'back-end/**'
+      - 'front-end/**'
+      - 'charts/**'
+
+env:
+  REGISTRY: "gitlab:5050"
+  BACK_IMAGE: "gitlab:5050/root/test/java-backend"
+  FRONT_IMAGE: "gitlab:5050/root/test/react-frontend"
+  CHARTS_DIR: "charts"
 
 jobs:
+  changes:
+    runs-on: self-hosted
+    outputs:
+      back: ${{ steps.filter.outputs.back }}
+      front: ${{ steps.filter.outputs.front }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v2
+        id: filter
+        with:
+          filters: |
+            back:
+              - '.github/workflows/**'
+              - 'back-end/**'
+              - 'charts/backend/**'
+            front:
+              - '.github/workflows/**'
+              - 'front-end/**'
+              - 'charts/frontend/**'
+
   build-back:
+    needs: changes
+    if: needs.changes.outputs.back == 'true'
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create Kaniko cache dir
+        run: mkdir -p /tmp/kaniko-cache
+
+      - name: Restore Kaniko cache
+        uses: actions/cache@v3
+        with:
+          path: /tmp/kaniko-cache
+          key: kaniko-back-${{ runner.os }}-${{ github.ref_name }}
+          restore-keys: |
+            kaniko-back-${{ runner.os }}-
+
       - name: Kaniko build backend
         uses: aevea/action-kaniko@master
         with:
-          registry: gitlab:5050
+          registry: ${{ env.REGISTRY }}
           image: root/test/java-backend
           username: ${{ secrets.GITLAB_REGISTRY_USER }}
           password: ${{ secrets.GITLAB_REGISTRY_PASSWORD }}
           tag: ${{ github.sha }}
           path: back-end
           build_file: dockerfile
-          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"
-#asdf
+          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid --cache=true --cache-dir=/tmp/kaniko-cache"
+
   build-front:
+    needs: changes
+    if: needs.changes.outputs.front == 'true'
     runs-on: self-hosted
     steps:
       - uses: actions/checkout@v4
 
+      - name: Create Kaniko cache dir
+        run: mkdir -p /tmp/kaniko-cache
+
+      - name: Restore Kaniko cache
+        uses: actions/cache@v3
+        with:
+          path: /tmp/kaniko-cache
+          key: kaniko-front-${{ runner.os }}-${{ github.ref_name }}
+          restore-keys: |
+            kaniko-front-${{ runner.os }}-
+
       - name: Kaniko build frontend
         uses: aevea/action-kaniko@master
         with:
-          registry: gitlab:5050
+          registry: ${{ env.REGISTRY }}
           image: root/test/react-frontend
           username: ${{ secrets.GITLAB_REGISTRY_USER }}
           password: ${{ secrets.GITLAB_REGISTRY_PASSWORD }}
           tag: ${{ github.sha }}
           path: front-end
           build_file: dockerfile
-          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid"
+          extra_args: "--insecure --skip-tls-verify --ignore-path=/product_uuid --cache=true --cache-dir=/tmp/kaniko-cache"
 
-  deploy:
-    needs: [build-back, build-front]
+  deploy-back:
+    needs: [changes, build-back]
+    if: |
+      always() &&
+      needs.changes.outputs.back == 'true' &&
+      (needs.build-back.result == 'success' || needs.build-back.result == 'skipped')
     runs-on: self-hosted
-  
     steps:
       - uses: actions/checkout@v4
-  
+
       - name: Check access
         run: |
           kubectl get ns
           helm list -A
-  
+
       - name: Deploy backend
         run: |
-  
-          helm upgrade --install backend ./charts/backend \
+          helm upgrade --install backend ./${{ env.CHARTS_DIR }}/backend \
             --namespace default \
-            --set image.repository=gitlab:5050/root/test/java-backend \
+            --set image.repository=${{ env.BACK_IMAGE }} \
             --set image.tag=${{ github.sha }}
-  
+
+  deploy-front:
+    needs: [changes, build-front]
+    if: |
+      always() &&
+      needs.changes.outputs.front == 'true' &&
+      (needs.build-front.result == 'success' || needs.build-front.result == 'skipped')
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check access
+        run: |
+          kubectl get ns
+          helm list -A
+
       - name: Deploy frontend
         run: |
-  
-          helm upgrade --install frontend ./charts/frontend \
+          helm upgrade --install frontend ./${{ env.CHARTS_DIR }}/frontend \
             --namespace default \
-            --set image.repository=gitlab:5050/root/test/react-frontend \
+            --set image.repository=${{ env.FRONT_IMAGE }} \
             --set image.tag=${{ github.sha }}

@@ -1,6 +1,6 @@
 replicaCount: 1
 image:
-  repository: harbor.local/library/react-frontend
+  repository: harbor.local:30443/library/react-frontend
   pullPolicy: IfNotPresent
   tag: "latest"
 

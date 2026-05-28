@@ -1,6 +1,6 @@
 replicaCount: 1
 image:
-  repository: harbor.local/library/java-backend
+  repository: harbor.local:30443/library/java-backend
   tag: "latest"
   pullPolicy: Always
 

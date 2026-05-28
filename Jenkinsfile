@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        HARBOR = 'harbor.local'
+        HARBOR = 'harbor.local:30443'
         BACK_IMAGE = "${HARBOR}/library/java-backend"
         FRONT_IMAGE = "${HARBOR}/library/react-frontend"
         COMMIT = "${env.GIT_COMMIT?.take(8) ?: 'latest'}"
@@ -26,6 +26,7 @@ pipeline {
                           --destination=${BACK_IMAGE}:latest \
                           --cache=true \
                           --cache-repo=${HARBOR}/library/cache \
+                          --insecure-registry=harbor.local:30443 \
                           --skip-tls-verify \
                           --ignore-path=/product_uuid \
                           --ignore-path=/proc \
@@ -46,6 +47,7 @@ pipeline {
                           --destination=${FRONT_IMAGE}:latest \
                           --cache=true \
                           --cache-repo=${HARBOR}/library/cache \
+                          --insecure-registry=harbor.local:30443 \
                           --skip-tls-verify \
                           --ignore-path=/product_uuid \
                           --ignore-path=/proc \

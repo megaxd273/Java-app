@@ -25,8 +25,8 @@ spec:
             - sh
             - -c
             - |
-              until nc -z postgres-postgresql 5432; do echo waiting for postgres; sleep 2; done;
-              until nc -z redis-master 6379; do echo waiting for redis; sleep 2; done;
+              until nc -z postgres-postgresql.postgres.svc.cluster.local 5432; do echo waiting for postgres; sleep 2; done;
+              until nc -z redis-master.redis.svc.cluster.local 6379; do echo waiting for redis; sleep 2; done;
       containers:
         - name: {{ .Chart.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

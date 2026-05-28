@@ -1,11 +1,11 @@
 replicaCount: 1
 image:
-  repository: gitlab:5050/root/test/react-frontend
+  repository: harbor.local/library/react-frontend
   pullPolicy: IfNotPresent
   tag: "latest"
 
 imagePullSecrets:
-  - name: gitlab-auth
+  - name: harbor-credentials
 
 labels:
   app: frontend

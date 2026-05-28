@@ -1,11 +1,11 @@
 replicaCount: 1
 image:
-  repository: gitlab:5050/root/test/java-backend
+  repository: harbor.local/library/java-backend
   tag: "latest"
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 imagePullSecrets:
-  - name: gitlab-auth
+  - name: harbor-credentials
 
 service:
   type: ClusterIP
@@ -26,16 +26,16 @@ resources:
     memory: "320Mi"
 
 env:
-  POSTGRES_HOST: postgres-postgresql
+  POSTGRES_HOST: postgres-postgresql.postgres.svc.cluster.local
   POSTGRES_PORT: 5432
   POSTGRES_USER: java_user
   POSTGRES_DB: java_db
 
-  REDIS_HOST: redis-master
+  REDIS_HOST: redis-master.redis.svc.cluster.local
   REDIS_PORT: 6379
 
-  FLUENTD_ENABLED: false
-  FLUENTD_HOST: localhost
+  FLUENTD_ENABLED: true
+  FLUENTD_HOST: fluentd.logging.svc.cluster.local
   FLUENTD_PORT: 24224
 
   SERVER_PORT: 8081

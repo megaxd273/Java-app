@@ -35,7 +35,7 @@ env:
   REDIS_PORT: 6379
 
   FLUENTD_ENABLED: true
-  FLUENTD_HOST: fluentd.logging.svc.cluster.local
+  FLUENTD_HOST: fluentd-aggregator.logging.svc.cluster.local
   FLUENTD_PORT: 24224
 
   SERVER_PORT: 8081
